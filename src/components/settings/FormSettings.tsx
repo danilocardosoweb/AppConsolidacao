@@ -1,46 +1,180 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Save, Plus, Trash2, Edit, FileText, ToggleLeft, ToggleRight } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import FieldModal, { FormField } from './FieldModal';
 
 interface FormSettingsProps {
   onSave: () => void;
 }
 
-const FormSettings: React.FC<FormSettingsProps> = ({ onSave }) => {
-  const [fields, setFields] = useState([
-    { id: 1, name: 'nome', label: 'Nome Completo', type: 'text', required: true, enabled: true },
-    { id: 2, name: 'email', label: 'Email', type: 'email', required: true, enabled: true },
-    { id: 3, name: 'telefone', label: 'Telefone', type: 'tel', required: true, enabled: true },
-    { id: 4, name: 'cidade', label: 'Cidade', type: 'text', required: false, enabled: true },
-    { id: 5, name: 'idade', label: 'Idade', type: 'number', required: false, enabled: true },
-    { id: 6, name: 'primeiraVez', label: 'Primeira vez na igreja?', type: 'checkbox', required: false, enabled: true },
-    { id: 7, name: 'observacoes', label: 'Observações', type: 'textarea', required: false, enabled: false }
-  ]);
+interface GeneralSettings {
+  autoSave: boolean;
+  showProgress: boolean;
+  allowDuplicates: boolean;
+  sendConfirmationEmail: boolean;
+  requireTerms: boolean;
+}
 
-  const [settings, setSettings] = useState({
+const FormSettings: React.FC<FormSettingsProps> = ({ onSave }) => {
+  const [fields, setFields] = useState<FormField[]>([]);
+  const [settings, setSettings] = useState<GeneralSettings>({
     autoSave: true,
     showProgress: true,
     allowDuplicates: false,
     sendConfirmationEmail: true,
     requireTerms: false
   });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingField, setEditingField] = useState<FormField | undefined>();
 
-  const toggleField = (fieldId: number) => {
-    setFields(fields.map(field => 
-      field.id === fieldId ? { ...field, enabled: !field.enabled } : field
-    ));
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fetchSettings = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Fetch fields config
+      const { data: fieldsData, error: fieldsError } = await supabase
+        .from('form_fields_config')
+        .select('*')
+        .order('id');
+
+      if (fieldsError) throw fieldsError;
+      setFields(fieldsData || []);
+
+      // Fetch general settings
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('general_settings')
+        .select('*')
+        .single();
+
+      if (settingsError && settingsError.code !== 'PGRST116') throw settingsError;
+      
+      if (settingsData) {
+        setSettings(settingsData);
+      }
+    } catch (err) {
+      console.error('Error fetching settings:', err);
+      setError('Erro ao carregar configurações');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const toggleRequired = (fieldId: number) => {
-    setFields(fields.map(field => 
-      field.id === fieldId ? { ...field, required: !field.required } : field
-    ));
+  const handleSave = async () => {
+    try {
+      // Save fields config
+      const { error: fieldsError } = await supabase
+        .from('form_fields_config')
+        .upsert(fields);
+
+      if (fieldsError) throw fieldsError;
+
+      // Save general settings
+      const { error: settingsError } = await supabase
+        .from('general_settings')
+        .upsert({ id: 1, ...settings });
+
+      if (settingsError) throw settingsError;
+
+      onSave();
+    } catch (err) {
+      console.error('Error saving settings:', err);
+      setError('Erro ao salvar configurações');
+    }
   };
 
-  const handleSave = () => {
-    console.log('Salvando configurações do formulário:', { fields, settings });
-    onSave();
+  const handleAddField = () => {
+    setEditingField(undefined);
+    setIsModalOpen(true);
   };
+
+  const handleEditField = (field: FormField) => {
+    setEditingField(field);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveField = async (field: FormField) => {
+    try {
+      if (field.id) {
+        // Update existing field
+        const { error } = await supabase
+          .from('form_fields_config')
+          .update(field)
+          .eq('id', field.id);
+
+        if (error) throw error;
+
+        setFields(fields.map(f => f.id === field.id ? field : f));
+      } else {
+        // Insert new field
+        const { data, error } = await supabase
+          .from('form_fields_config')
+          .insert(field)
+          .select()
+          .single();
+
+        if (error) throw error;
+        if (data) setFields([...fields, data]);
+      }
+    } catch (err) {
+      console.error('Error saving field:', err);
+      setError('Erro ao salvar campo');
+    }
+  };
+
+  const toggleField = async (fieldId: number) => {
+    try {
+      const field = fields.find(f => f.id === fieldId);
+      if (!field) return;
+
+      const updatedField = { ...field, enabled: !field.enabled };
+      const { error } = await supabase
+        .from('form_fields_config')
+        .update(updatedField)
+        .eq('id', fieldId);
+
+      if (error) throw error;
+
+      setFields(fields.map(f => f.id === fieldId ? updatedField : f));
+    } catch (err) {
+      console.error('Error toggling field:', err);
+      setError('Erro ao atualizar campo');
+    }
+  };
+
+  const toggleRequired = async (fieldId: number) => {
+    try {
+      const field = fields.find(f => f.id === fieldId);
+      if (!field) return;
+
+      const updatedField = { ...field, required: !field.required };
+      const { error } = await supabase
+        .from('form_fields_config')
+        .update(updatedField)
+        .eq('id', fieldId);
+
+      if (error) throw error;
+
+      setFields(fields.map(f => f.id === fieldId ? updatedField : f));
+    } catch (err) {
+      console.error('Error toggling required:', err);
+      setError('Erro ao atualizar campo');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-church-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border p-6 space-y-6">
@@ -54,6 +188,12 @@ const FormSettings: React.FC<FormSettingsProps> = ({ onSave }) => {
         </div>
       </div>
 
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
+          {error}
+        </div>
+      )}
+
       <div className="grid lg:grid-cols-2 gap-8">
         {/* Campos do Formulário */}
         <div className="space-y-4">
@@ -65,7 +205,7 @@ const FormSettings: React.FC<FormSettingsProps> = ({ onSave }) => {
                 <div className="flex-1">
                   <div className="flex items-center space-x-3">
                     <button
-                      onClick={() => toggleField(field.id)}
+                      onClick={() => toggleField(field.id!)}
                       className="text-church-primary hover:text-church-secondary"
                     >
                       {field.enabled ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
@@ -83,7 +223,7 @@ const FormSettings: React.FC<FormSettingsProps> = ({ onSave }) => {
                 <div className="flex items-center space-x-2">
                   {field.enabled && (
                     <button
-                      onClick={() => toggleRequired(field.id)}
+                      onClick={() => toggleRequired(field.id!)}
                       className={`px-3 py-1 text-xs rounded-full transition-colors ${
                         field.required 
                           ? 'bg-red-100 text-red-700 hover:bg-red-200' 
@@ -93,7 +233,10 @@ const FormSettings: React.FC<FormSettingsProps> = ({ onSave }) => {
                       {field.required ? 'Obrigatório' : 'Opcional'}
                     </button>
                   )}
-                  <button className="p-2 text-gray-400 hover:text-gray-600">
+                  <button 
+                    onClick={() => handleEditField(field)}
+                    className="p-2 text-gray-400 hover:text-gray-600"
+                  >
                     <Edit className="w-4 h-4" />
                   </button>
                 </div>
@@ -101,7 +244,10 @@ const FormSettings: React.FC<FormSettingsProps> = ({ onSave }) => {
             ))}
           </div>
 
-          <button className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-church-primary hover:text-church-primary transition-colors flex items-center justify-center space-x-2">
+          <button 
+            onClick={handleAddField}
+            className="w-full p-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-church-primary hover:text-church-primary transition-colors flex items-center justify-center space-x-2"
+          >
             <Plus className="w-5 h-5" />
             <span>Adicionar Campo Personalizado</span>
           </button>
@@ -189,6 +335,13 @@ const FormSettings: React.FC<FormSettingsProps> = ({ onSave }) => {
           <span>Salvar Configurações</span>
         </button>
       </div>
+
+      <FieldModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleSaveField}
+        field={editingField}
+      />
     </div>
   );
 };

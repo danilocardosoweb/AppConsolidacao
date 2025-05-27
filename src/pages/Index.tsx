@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, UserPlus, BarChart3, Calendar, Heart, ArrowRight, Sparkles, FileText } from 'lucide-react';
 import Dashboard from '../components/Dashboard';
 import VisitorForm from '../components/VisitorForm';
@@ -14,9 +14,23 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { supabase } from '../integrations/supabase/client';
 
 const Index = () => {
   const [currentView, setCurrentView] = useState('home');
+  const [showFooterImageModal, setShowFooterImageModal] = useState(false);
+  const [showLogoModal, setShowLogoModal] = useState(false);
+  const [totalVisitantes, setTotalVisitantes] = useState<number | null>(null);
+
+  useEffect(() => {
+    async function fetchStats() {
+      const { data, error } = await supabase.from('visitors').select('id');
+      if (!error && data) {
+        setTotalVisitantes(data.length);
+      }
+    }
+    fetchStats();
+  }, []);
 
   if (currentView === 'dashboard') {
     return <Dashboard onNavigate={setCurrentView} />;
@@ -60,11 +74,13 @@ const Index = () => {
         <nav className="relative z-10 container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <img 
-                src="/src/assets/Consolidação_Com_fundo2.png" 
-                alt="Logo Ministério de Consolidação" 
-                className="h-12 w-auto object-contain"
-              />
+              <div className="cursor-pointer" onClick={() => setShowLogoModal(true)}>
+                <img 
+                  src="../../Imagem/Group_439-removebg-preview.png" 
+                  alt="Logo Ministério de Consolidação" 
+                  className="h-24 w-auto object-contain"
+                />
+              </div>
               <h1 className="text-2xl font-playfair font-bold text-black">
                 Ministério de Consolidação
               </h1>
@@ -109,9 +125,9 @@ const Index = () => {
               <br />
               <span className="text-gray-800">à Nossa Igreja</span>
             </h2>
+            <div className="text-2xl font-semibold text-black bg-white/80 px-4 py-2 rounded-lg shadow-md inline-block mb-6">Igreja Vida Nova Hortolândia</div>
             <p className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto leading-relaxed">
-              Sistema moderno e intuitivo para cadastramento de visitantes. 
-              Gerencie presenças com elegância e eficiência.
+              Um lugar para Amar e Ser Amado!
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -123,27 +139,8 @@ const Index = () => {
                 <span>Cadastrar Visitante</span>
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </button>
-
-              <button
-                onClick={() => setCurrentView('dashboard')}
-                className="glass-effect px-8 py-4 rounded-xl text-gray-700 hover:bg-white/90 transition-all duration-300 flex items-center space-x-3"
-              >
-                <BarChart3 className="w-6 h-6" />
-                <span>Ver Dashboard</span>
-              </button>
             </div>
           </div>
-        </div>
-
-        {/* Floating Elements */}
-        <div className="absolute top-20 left-10 animate-bounce">
-          <div className="w-4 h-4 bg-church-primary/30 rounded-full"></div>
-        </div>
-        <div className="absolute top-32 right-20 animate-bounce delay-1000">
-          <div className="w-6 h-6 bg-church-secondary/30 rounded-full"></div>
-        </div>
-        <div className="absolute bottom-20 left-1/4 animate-bounce delay-500">
-          <Sparkles className="w-8 h-8 text-church-accent/50" />
         </div>
       </section>
 
@@ -215,7 +212,7 @@ const Index = () => {
         <div className="container mx-auto">
           <div className="grid md:grid-cols-4 gap-8 text-center">
             <div className="animate-slide-up">
-              <div className="text-4xl font-bold gradient-text mb-2">1,250+</div>
+              <div className="text-4xl font-bold gradient-text mb-2">{totalVisitantes !== null ? totalVisitantes.toLocaleString('pt-BR') + '+' : '-'}</div>
               <div className="text-gray-600">Visitantes Cadastrados</div>
             </div>
             <div className="animate-slide-up delay-200">
@@ -260,16 +257,16 @@ const Index = () => {
           <div className="text-left">
             <div className="flex items-center space-x-3 mb-4">
               {/* Aqui você pode adicionar o logo, se tiver */}
-              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
-                <Heart className="w-6 h-6 text-gray-800" /> {/* Ícone placeholder */}
+              <div className="w-20 h-20 overflow-hidden rounded-xl flex items-center justify-center bg-white cursor-pointer" onClick={() => setShowFooterImageModal(true)}>
+                <img src="../../Imagem/Consolidacao_Com_Fundo_Azul.png" alt="Logo Geração José" className="w-full h-full object-cover rounded-xl transition-transform duration-200 hover:scale-110" />
               </div>
               <div>
-                <h3 className="text-xl font-playfair font-bold">Geração Israel</h3>
-                <p className="text-sm text-gray-400">Sistema de Reservas</p> {/* Texto placeholder */}
+                <h3 className="text-xl font-playfair font-bold">Geração José</h3>
+                <p className="text-sm text-gray-400">Sistema de Acolhimento</p> {/* Texto placeholder */}
               </div>
             </div>
             <p className="text-gray-400 leading-relaxed mb-4">
-              Mais que reservas, experiências que conectam propósito e exclusividade. {/* Texto placeholder */}
+              Corações firmados em Deus, como José, para viver o extraordinário.
             </p>
             {/* Ícone do Instagram - placeholder */}
             <div className="flex items-center space-x-4">
@@ -279,17 +276,6 @@ const Index = () => {
                 </svg>
               </a>
             </div>
-          </div>
-
-          {/* Seção Links Rápidos */}
-          <div className="text-left">
-            <h3 className="text-xl font-bold mb-4">Links Rápidos</h3>
-            <ul className="space-y-2 text-gray-400">
-              <li><a href="#" className="hover:text-white transition-colors">Produtos</a></li> {/* Link placeholder */}
-              <li><a href="#" className="hover:text-white transition-colors">Como Reservar</a></li> {/* Link placeholder */}
-              <li><a href="#" className="hover:text-white transition-colors">Eventos</a></li> {/* Link placeholder */}
-              <li><a href="#" className="hover:text-white transition-colors">Localização</a></li> {/* Link placeholder */}
-            </ul>
           </div>
 
           {/* Seção Contato */}
@@ -305,21 +291,40 @@ const Index = () => {
               </div>
               <div className="flex items-center space-x-2">
                 {/* Ícone de Email - placeholder */}
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-                  <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
-                </svg>
-                <span>contato@geracaoisrael.com.br</span> {/* Email placeholder */}
               </div>
             </div>
           </div>
         </div>
         {/* Direitos Autorais */}
         <div className="mt-8 border-t border-gray-700 pt-8 text-center text-gray-500 text-sm">
-          <p>&copy; 2024 Sistema Igreja. Todos os direitos reservados.</p>
-          <p className="text-xs mt-2">Desenvolvido com ❤️ por Danilo Cardoso</p> {/* Texto placeholder */}
+          <p>&copy; 2025 Geração José. Todos os direitos reservados.</p>
+          <p className="text-xs mt-2">Desenvolvido com ❤️ por <span className="text-yellow-400">Danilo Cardoso</span></p> {/* Texto placeholder */}
         </div>
       </footer>
+
+      {/* Modal de imagem ampliada do rodapé */}
+      {showFooterImageModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => setShowFooterImageModal(false)}>
+          <img
+            src="../../Imagem/Consolidacao_Com_Fundo_Azul.png"
+            alt="Logo Geração José Ampliado"
+            className="max-w-2xl max-h-[90vh] w-full h-auto rounded-2xl shadow-2xl border-4 border-white"
+            onClick={e => e.stopPropagation()}
+          />
+        </div>
+      )}
+
+      {/* Modal de imagem ampliada do logo do topo */}
+      {showLogoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => setShowLogoModal(false)}>
+          <img
+            src="../../Imagem/Consolidacao_Com_Fundo_Preto.png"
+            alt="Logo Igreja Vida Nova Hortolândia Ampliado"
+            className="max-w-2xl max-h-[90vh] w-full h-auto rounded-xl shadow-2xl border-4 border-white"
+            onClick={e => e.stopPropagation()}
+          />
+        </div>
+      )}
 
     </div>
   );
